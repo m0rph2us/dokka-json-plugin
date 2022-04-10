@@ -69,8 +69,12 @@ class CustomRenderer(val context: DokkaContext) : Renderer {
         }
 
         (node.documentable as DModule).packages[0].children.forEach { documentable ->
-            (documentable as DClass).classlikes.forEach { classlike ->
-                classDocumentation(classlike)
+            when (documentable) {
+                is DClass -> {
+                    documentable.classlikes.forEach { classlike ->
+                        classDocumentation(classlike)
+                    }
+                }
             }
         }
     }
