@@ -57,23 +57,31 @@ class CustomRenderer(val context: DokkaContext) : Renderer {
         }
     }
 
-    private fun CoroutineScope.renderPage(node: PageNode, path: String = "") = launch {
+    private fun CoroutineScope.renderPage(node: PageNode) = launch {
         when (node) {
             is ModulePageNode -> renderModulePageNode(node)
         }
     }
 
     private fun CoroutineScope.renderModulePageNode(node: ModulePageNode) {
-        (node.documentable as DModule).packages[0].classlikes.forEach { classlike ->
-            classDocumentation(classlike)
-        }
+        (node.documentable as DModule).packages.forEach { packageItem ->
+            packageItem.classlikes.forEach { classlike ->
+                classDocumentation(classlike)
+            }
 
-        (node.documentable as DModule).packages[0].children.forEach { documentable ->
+            renderChildren(packageItem.children)
+        }
+    }
+
+    private fun CoroutineScope.renderChildren(documentables: List<Documentable>) {
+        documentables.forEach { documentable ->
             when (documentable) {
                 is DClass -> {
                     documentable.classlikes.forEach { classlike ->
                         classDocumentation(classlike)
                     }
+
+                    renderChildren(documentable.children)
                 }
             }
         }
@@ -137,7 +145,12 @@ class CustomRenderer(val context: DokkaContext) : Renderer {
                 it.name,
                 FunctionDocumentation(
                     comment = extractComment(it.documentation),
-                    parameters = mapOf(),
+                    parameters = it.parameters.associate { param ->
+                        Pair(
+                            param.name!!,
+                            extractComment(param.documentation)
+                        )
+                    },
                     tags = mapOf()
                 )
             )
