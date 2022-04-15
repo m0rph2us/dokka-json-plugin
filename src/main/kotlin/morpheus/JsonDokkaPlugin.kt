@@ -10,9 +10,7 @@ import org.jetbrains.dokka.CoreExtensions
 import org.jetbrains.dokka.base.DokkaBase
 import org.jetbrains.dokka.base.renderers.OutputWriter
 import org.jetbrains.dokka.model.*
-import org.jetbrains.dokka.model.doc.DocTag
-import org.jetbrains.dokka.model.doc.DocumentationNode
-import org.jetbrains.dokka.model.doc.Text
+import org.jetbrains.dokka.model.doc.*
 import org.jetbrains.dokka.pages.*
 import org.jetbrains.dokka.plugability.DokkaContext
 import org.jetbrains.dokka.plugability.DokkaPlugin
@@ -105,7 +103,12 @@ class CustomRenderer(val context: DokkaContext) : Renderer {
     private fun extractComment(documentation: SourceSetDependent<DocumentationNode>): String {
         return StringBuilder().let { sb ->
             documentation.values.forEach { documentationNode ->
-                sb.append(buildChildrenComment(documentationNode.children[0].root))
+                documentationNode.children.forEach { child ->
+                    when (child) {
+                        is Description -> sb.append(buildChildrenComment(child.root))
+                        else -> {}
+                    }
+                }
             }
             sb.toString()
         }
@@ -145,15 +148,55 @@ class CustomRenderer(val context: DokkaContext) : Renderer {
                 it.name,
                 FunctionDocumentation(
                     comment = extractComment(it.documentation),
-                    parameters = it.parameters.associate { param ->
-                        Pair(
-                            param.name!!,
-                            extractComment(param.documentation)
-                        )
-                    },
-                    tags = mapOf()
+                    parameters = extractParameters(it.parameters),
+                    tags = extractTags(it.documentation)
                 )
             )
+        }
+    }
+
+    private fun extractParameters(parameters: List<DParameter>): Map<String, String> {
+        return parameters.associate { param ->
+            Pair(
+                param.name!!,
+                extractParamComment(param.documentation)
+            )
+        }
+    }
+
+    private fun extractParamComment(documentation: SourceSetDependent<DocumentationNode>): String {
+        return StringBuilder().let { sb ->
+            documentation.values.forEach { documentationNode ->
+                documentationNode.children.forEach { child ->
+                    when (child) {
+                        is Param -> sb.append(buildChildrenComment(child.root))
+                        else -> {}
+                    }
+                }
+            }
+            sb.toString()
+        }
+    }
+
+    private fun extractTags(documentation: SourceSetDependent<DocumentationNode>): Map<String, String> {
+        return mutableMapOf<String, String>().let { result ->
+            documentation.values.forEach { documentationNode ->
+                documentationNode.children.forEach { child ->
+                    when (child) {
+                        is Param -> {
+                            result["parameters"] = buildChildrenComment(child.root)
+                        }
+                        is See -> {
+                            result[child.name] = buildChildrenComment(child.root)
+                        }
+                        is CustomTagWrapper -> {
+                            result[child.name] = buildChildrenComment(child.root)
+                        }
+                        else -> {}
+                    }
+                }
+            }
+            result
         }
     }
 }
